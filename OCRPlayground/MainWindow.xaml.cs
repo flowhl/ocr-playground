@@ -1,11 +1,14 @@
-﻿using OCRPlayground.Core;
+﻿using Microsoft.Win32;
+using OCRPlayground.Core;
 using OCRPlayground.Models;
 using OCRPlayground.UI;
 using OpenCvSharp.WpfExtensions;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +19,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using static OpenCvSharp.Stitcher;
 
 namespace OCRPlayground
 {
@@ -94,7 +98,7 @@ namespace OCRPlayground
             }
 
             //process each item
-            foreach(var item in Items)
+            foreach (var item in Items)
             {
                 methodInfo.Invoke(null, new object[] { item });
             }
@@ -119,7 +123,151 @@ namespace OCRPlayground
                 SPOutput.Children.Add(res);
             }
 
-            ResultText.Content = $"Processed: {Items.Count} Images \nAverage Accuracy: {Math.Round(Items.Average(x => x.Accuracy),2)}\nMax Accuracy: {Math.Round(Items.Max(x => x.Accuracy),2)} \nMin Accuracy: {Math.Round(Items.Min(x => x.Accuracy),2)}";
+            ResultText.Content = $"Processed: {Items.Count} Images \nAverage Accuracy: {Math.Round(Items.Average(x => x.Accuracy), 2)}\nMax Accuracy: {Math.Round(Items.Max(x => x.Accuracy), 2)} \nMin Accuracy: {Math.Round(Items.Min(x => x.Accuracy), 2)}";
         }
+
+        public async void RunMassTest()
+        {
+            DateTime Start = DateTime.Now;
+
+            List<Task> taskList = new List<Task>();
+            SemaphoreSlim semaphore = new SemaphoreSlim(12);
+
+            foreach (var file in Files)
+            {
+                await semaphore.WaitAsync();
+
+                var task = Task.Run(() =>
+                {
+                    try
+                    {
+                        using (var newItem = new OCRItem())
+                        {
+                            newItem.InputImagePath = file;
+                            newItem.FillInputImage();
+                            ImageProcessor.TryEachSetting(newItem);
+                        }
+                        GC.Collect();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                taskList.Add(task);
+            }
+
+            Task.WaitAll(taskList.ToArray());
+            
+
+            List<OCRAverageResults> AverageSettings = new List<OCRAverageResults>();
+            lock (ImageProcessor.MassResults)
+            {
+
+                var AllSettings = ImageProcessor.MassResults.Select(x => x.Settings).Distinct().ToList();
+                var AllTypes = ImageProcessor.MassResults.Select(x => x.Type).Distinct().ToList();
+                foreach (var type in AllTypes)
+                {
+                    foreach (var setting in AllSettings)
+                    {
+                        double average = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Average(x => x.Accuracy);
+                        double max = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Max(x => x.Accuracy);
+                        double min = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Min(x => x.Accuracy);
+                        AverageSettings.Add(new OCRAverageResults { Accuracy = average, MaxAccuracy = max, MinAccuracy = min, Settings = setting, Type = type });
+                    }
+                }
+
+                DateTime End = DateTime.Now;
+
+                var duration = End - Start;
+
+                AverageSettings = AverageSettings.OrderByDescending(x => x.Accuracy).ToList();
+
+                ExportRawCSV(ImageProcessor.MassResults);
+                ExportGroupedCSV(AverageSettings);
+
+            }
+        }
+
+        public void ExportRawCSV(List<OCRResultData> data)
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("Accuracy");
+            dt.Columns.Add("ScaleUp;EnsureBlackText;ApplyNonLocalMeansDenoisingSettings;ApplyBilateralFilterSettings;ApplyMedianFilterSettings;ApplyGaussianBlurSettings;Threshold");
+            dt.Columns.Add("Type");
+
+            foreach (var row in data)
+            {
+                dt.Rows.Add(new string[]
+                {
+                    row.Accuracy.ToString(),
+                    row.Settings,
+                    row.Type.ToString(),
+                });
+            }
+
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Filter = "CSV files (*.csv)|*.csv";
+            saveFileDialog.InitialDirectory = "D:\\Github_repos\\xstrat\\OCRPlayground\\results";
+            saveFileDialog.FileName = "raw_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv";
+
+            var res = saveFileDialog.ShowDialog();
+
+            if (res ?? false)
+            {
+                CSVHelper.SaveDataTableToCSV(dt, saveFileDialog.FileName);
+            }
+        }
+
+
+
+        public void ExportGroupedCSV(List<OCRAverageResults> data)
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("Accuracy");
+            dt.Columns.Add("MinAccuracy");
+            dt.Columns.Add("MaxAccuracy");
+            dt.Columns.Add("ScaleUp;EnsureBlackText;ApplyNonLocalMeansDenoisingSettings;ApplyBilateralFilterSettings;ApplyMedianFilterSettings;ApplyGaussianBlurSettings;Threshold");
+            dt.Columns.Add("Type");
+
+            foreach (var row in data)
+            {
+                dt.Rows.Add(new string[]
+                {
+                    row.Accuracy.ToString(),
+                    row.MinAccuracy.ToString(),
+                    row.MaxAccuracy.ToString(),
+                    row.Settings,
+                    row.Type.ToString(),
+                });
+            }
+
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Filter = "CSV files (*.csv)|*.csv";
+            saveFileDialog.InitialDirectory = "D:\\Github_repos\\xstrat\\OCRPlayground\\results";
+            saveFileDialog.FileName = "grouped_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv";
+
+            var res = saveFileDialog.ShowDialog();
+
+            if (res ?? false)
+            {
+                CSVHelper.SaveDataTableToCSV(dt, saveFileDialog.FileName);
+            }
+        }
+
+        private void btnMassTest_Click(object sender, RoutedEventArgs e)
+        {
+            RunMassTest();
+        }
+    }
+
+    public class OCRAverageResults
+    {
+        public double Accuracy { get; set; }
+        public double MinAccuracy { get; set; }
+        public double MaxAccuracy { get; set; }
+        public string Settings { get; set; }
+        public string Type { get; set; }
     }
 }

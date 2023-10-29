@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace OCRPlayground.Models
 {
-    public class OCRItem
+    public class OCRItem : IDisposable
     {
-        public List<Mat> ResultImages { get; set; }
+        public List<Mat> ResultImages { get; set; } = new List<Mat>();
         public double Accuracy { get; set; }
         public Mat InputImage { get; set; }
         public string InputImagePath { get; set; }
@@ -26,5 +26,18 @@ namespace OCRPlayground.Models
             InputImage = new Mat(InputImagePath);
             Trace.WriteLine($"Loaded {InputImagePath}");
         }
+
+        public void Dispose()
+        {
+            ResultImages.Clear();
+            ResultImages = null;
+            Accuracy = 0;
+            InputImage = null;
+            InputImagePath = null;
+            Text = null;
+            GC.Collect();
+        }
+
+        public List<Tuple<double, string>> MassAccuracy { get; set; } = new List<Tuple<double, string>>();
     }
 }

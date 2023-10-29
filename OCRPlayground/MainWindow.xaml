@@ -22,6 +22,7 @@
             <Button Style="{StaticResource Primary}" Height="30" Name="btnSelectFiles" Click="btnSelectFiles_Click">Select Files</Button>
             <ComboBox Name="CBMethod"></ComboBox>
             <Button Style="{StaticResource Primary}" Height="30" Name="btnRun" Click="btnRun_Click">Run</Button>
+            <Button Style="{StaticResource Primary}" Height="30" Name="btnMassTest" Click="btnMassTest_Click" >Mass Test</Button>
             <Label Style="{StaticResource PS}" Name="ResultText"></Label>
         </StackPanel>
     </Grid>

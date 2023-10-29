@@ -52,4 +52,19 @@ namespace OCRPlayground.Core
             return input.Trim();
         }
     }
+
+    public static class ListExtensions
+    {
+        public static T GetRandomElement<T>(this List<T> list)
+        {
+            if (list == null || list.Count == 0)
+            {
+                throw new ArgumentException("The list cannot be null or empty.");
+            }
+
+            Random rand = new Random();
+            int index = rand.Next(list.Count);
+            return list[index];
+        }
+    }
 }
