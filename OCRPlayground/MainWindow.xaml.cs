@@ -176,7 +176,11 @@ namespace OCRPlayground
                         double average = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Average(x => x.Accuracy);
                         double max = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Max(x => x.Accuracy);
                         double min = ImageProcessor.MassResults.Where(x => x.Settings == setting && x.Type == type).Min(x => x.Accuracy);
-                        AverageSettings.Add(new OCRAverageResults { Accuracy = average, MaxAccuracy = max, MinAccuracy = min, Settings = setting, Type = type });
+                        int nullItemCount = ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type && x.ResultText.IsNullOrEmpty());
+                        double nullItemRate = (double)nullItemCount / (double)ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type);
+                        int numericCount = ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type && x.ResultText.IsNumeric());
+                        double numericRate = (double)numericCount / (double)ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type);
+                        AverageSettings.Add(new OCRAverageResults { Accuracy = average, MaxAccuracy = max, MinAccuracy = min, Settings = setting, Type = type, NullItemCount = nullItemCount, NullItemRate = nullItemRate, NumericCount = numericCount, NumericRate = numericRate});
                     }
                 }
 
@@ -198,6 +202,7 @@ namespace OCRPlayground
             dt.Columns.Add("Accuracy");
             dt.Columns.Add("ScaleUp;EnsureBlackText;ApplyNonLocalMeansDenoisingSettings;ApplyBilateralFilterSettings;ApplyMedianFilterSettings;ApplyGaussianBlurSettings;Threshold");
             dt.Columns.Add("Type");
+            dt.Columns.Add("TextIsEmpty");
 
             foreach (var row in data)
             {
@@ -206,6 +211,7 @@ namespace OCRPlayground
                     row.Accuracy.ToString(),
                     row.Settings,
                     row.Type.ToString(),
+                    row.ResultText.IsNullOrEmpty().ToString(),
                 });
             }
 
@@ -232,6 +238,10 @@ namespace OCRPlayground
             dt.Columns.Add("MaxAccuracy");
             dt.Columns.Add("ScaleUp;EnsureBlackText;ApplyNonLocalMeansDenoisingSettings;ApplyBilateralFilterSettings;ApplyMedianFilterSettings;ApplyGaussianBlurSettings;Threshold");
             dt.Columns.Add("Type");
+            dt.Columns.Add("NullItemCount");
+            dt.Columns.Add("NullItemRate");
+            dt.Columns.Add("NumericCount");
+            dt.Columns.Add("NumericRate");
 
             foreach (var row in data)
             {
@@ -242,6 +252,10 @@ namespace OCRPlayground
                     row.MaxAccuracy.ToString(),
                     row.Settings,
                     row.Type.ToString(),
+                    row.NullItemCount.ToString(),
+                    row.NullItemRate.ToString(),
+                    row.NumericCount.ToString(),
+                    row.NumericRate.ToString(),
                 });
             }
 
@@ -271,5 +285,9 @@ namespace OCRPlayground
         public double MaxAccuracy { get; set; }
         public string Settings { get; set; }
         public string Type { get; set; }
+        public int NullItemCount { get; set; }
+        public double NullItemRate { get; set; }
+        public int NumericCount { get; set; }
+        public double NumericRate { get; set; }
     }
 }

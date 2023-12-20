@@ -51,6 +51,11 @@ namespace OCRPlayground.Core
             }
             return input.Trim();
         }
+
+        public static bool IsNumeric(this string str)
+        {
+            return int.TryParse(str, out _);
+        }
     }
 
     public static class ListExtensions

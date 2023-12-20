@@ -15,6 +15,7 @@ namespace OCRPlayground.Core
         public double Accuracy { get; set; }
         public string Settings { get; set; }
         public string Type { get; set; }
+        public string ResultText { get; set; }
         public OCRResultData() { }
     }
 
@@ -82,7 +83,7 @@ namespace OCRPlayground.Core
             }
             var topItem = item.MassAccuracy.OrderByDescending(x => x.Item1).First();
             string mostAcc = $"Accuracy: {topItem.Item1} | Settings: {topItem.Item2}";
-            TopMassResults.Add(new OCRResultData() { Accuracy = topItem.Item1, Settings = String.Copy(topItem.Item2) });
+            TopMassResults.Add(new OCRResultData() { Accuracy = topItem.Item1, Settings = String.Copy(topItem.Item2)});
             item = null;
         }
 

@@ -52,7 +52,7 @@ namespace OCRPlayground.Core
                         {
                             lock (ImageProcessor.MassResults)
                             {
-                                ImageProcessor.MassResults.Add(new OCRResultData { Accuracy = page.GetMeanConfidence(), Settings = settingsstring, Type = type });
+                                ImageProcessor.MassResults.Add(new OCRResultData { Accuracy = page.GetMeanConfidence(), Settings = settingsstring, Type = type, ResultText = text });
                             }
                             item.MassAccuracy.Add(new Tuple<double, string>(page.GetMeanConfidence(), settingsstring));
                         }
