@@ -25,14 +25,14 @@ namespace OCRPlayground.Core
 
 
 
-        public static void NoPreprocessing(OCRItem item)
+        public static void NoPreprocessing(OCRItem item, string progressString = null)
         {
             item.ResultImages = new List<OpenCvSharp.Mat>();
             item.ResultImages.Add(item.InputImage);
-            OCRHelper.ProcessWithTesseract(item);
+            OCRHelper.ProcessWithTesseract(item, false, "", progressString);
         }
 
-        public static void Otsu(OCRItem item)
+        public static void Otsu(OCRItem item, string progressString = null)
         {
             item.ResultImages = new List<OpenCvSharp.Mat>();
             //original
@@ -44,11 +44,11 @@ namespace OCRPlayground.Core
             //Otsu
             item.ResultImages.Add(OCRHelper.ApplyThreshold(item.ResultImages.Last()));
 
-            OCRHelper.ProcessWithTesseract(item);
+            OCRHelper.ProcessWithTesseract(item, false, "", progressString);
         }
 
 
-        public static void Preprocess1(OCRItem item)
+        public static void Preprocess1(OCRItem item, string progressString = null)
         {
             item.ResultImages = new List<OpenCvSharp.Mat>();
 
@@ -69,15 +69,16 @@ namespace OCRPlayground.Core
             item.ResultImages.Add(OCRHelper.EnsureBlackTextOnWhite(item.ResultImages.Last()));
 
 
-            OCRHelper.ProcessWithTesseract(item);
+            OCRHelper.ProcessWithTesseract(item, false, "", progressString);
         }
 
-        public static void TryEachSetting(OCRItem item)
+        public static void TryEachSetting(OCRItem item, string progressString = null)
         {
             var possibleSettings = GenerateLimitedSettingsCombinations();
             foreach (var settings in possibleSettings)
             {
-                ApplySettings(item, settings);
+                string progress = progressString + $" settings: {possibleSettings.IndexOf(settings)}/{possibleSettings.Count}";
+                ApplySettings(item, settings, progress);
             }
             var topItem = item.MassAccuracy.OrderByDescending(x => x.Item1).First();
             string mostAcc = $"Accuracy: {topItem.Item1} | Settings: {topItem.Item2}";
@@ -85,7 +86,7 @@ namespace OCRPlayground.Core
             item = null;
         }
 
-        public static void ApplySettings(OCRItem item, Settings settings)
+        public static void ApplySettings(OCRItem item, Settings settings, string progressString = null)
         {
             //preprocessing
             //original
@@ -150,7 +151,7 @@ namespace OCRPlayground.Core
 
             string ssettings = settings.GetSettings();
 
-            OCRHelper.ProcessWithTesseract(item, true, ssettings);
+            OCRHelper.ProcessWithTesseract(item, true, ssettings, progressString);
         }
 
         /// <summary>

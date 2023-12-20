@@ -100,7 +100,8 @@ namespace OCRPlayground
             //process each item
             foreach (var item in Items)
             {
-                methodInfo.Invoke(null, new object[] { item });
+                string progress = $"item: {Items.IndexOf(item) + 1}/{Items.Count}";
+                methodInfo.Invoke(null, new object[] { item, progress});
             }
 
             //display 
@@ -143,9 +144,10 @@ namespace OCRPlayground
                     {
                         using (var newItem = new OCRItem())
                         {
+                            string progress = $"item: {Files.IndexOf(file) + 1}/{Files.Count}";
                             newItem.InputImagePath = file;
                             newItem.FillInputImage();
-                            ImageProcessor.TryEachSetting(newItem);
+                            ImageProcessor.TryEachSetting(newItem, progress);
                         }
                         GC.Collect();
                     }

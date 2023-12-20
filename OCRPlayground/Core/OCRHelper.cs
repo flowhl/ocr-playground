@@ -12,7 +12,7 @@ namespace OCRPlayground.Core
 {
     public static class OCRHelper
     {
-        public static void ProcessWithTesseract(OCRItem item, bool useMassAccuracy = false, string settingsstring = "")
+        public static void ProcessWithTesseract(OCRItem item, bool useMassAccuracy = false, string settingsstring = "", string progressString = null)
         {
             if (item.InputImage.Empty()) return;
 
@@ -35,15 +35,15 @@ namespace OCRPlayground.Core
                         {
                             type = "name";
                         }
-                        else if (item.InputImagePath.Contains("$score"))
+                        else if (item.InputImagePath.Contains("$score") || item.InputImagePath.ToLower().Contains("score"))
                         {
                             type = "score";
                         }
-                        else if (item.InputImagePath.Contains("$teamname"))
+                        else if (item.InputImagePath.Contains("$teamname") || item.InputImagePath.ToLower().Contains("teamname"))
                         {
                             type = "teamname";
                         }
-                        else if (item.InputImagePath.Contains("time"))
+                        else if (item.InputImagePath.Contains("time") || item.InputImagePath.ToLower().Contains("time"))
                         {
                             type = "time";
                         }
@@ -58,7 +58,7 @@ namespace OCRPlayground.Core
                         }
                     }
 
-                    Trace.WriteLine("Extracted text: " + text);
+                    Trace.WriteLine("Extracted text: " + text + " progress: " + progressString);
                     item.Text = text;
                 }
             }
