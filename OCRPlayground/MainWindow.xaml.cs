@@ -144,7 +144,9 @@ namespace OCRPlayground
                     {
                         using (var newItem = new OCRItem())
                         {
-                            string progress = $"item: {Files.IndexOf(file) + 1}/{Files.Count}";
+                            int totalAmount = Files.Count;
+                            int padValue = totalAmount.ToString().Length;
+                            string progress = $"item: {(Files.IndexOf(file) + 1).ToString().PadLeft(padValue, '0')}/{Files.Count} progress: {(((double)Files.IndexOf(file) + 1)/((double)Files.Count) * 100).ToString("F2")}%";
                             newItem.InputImagePath = file;
                             newItem.FillInputImage();
                             ImageProcessor.TryEachSetting(newItem, progress);
