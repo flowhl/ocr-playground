@@ -2,6 +2,7 @@
 using OpenCvSharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Text;
@@ -73,28 +74,108 @@ namespace OCRPlayground.Core
             OCRHelper.ProcessWithTesseract(item, false, "", progressString);
         }
 
+        public static void GreyAndContrast(OCRItem item, string progressString = null)
+        {
+            item.ResultImages = new List<OpenCvSharp.Mat>();
+
+            //original
+            item.ResultImages.Add(item.InputImage);
+
+            //upscale to 100
+            //item.ResultImages.Add(OCRHelper.ScaleUp(item.ResultImages.Last(), 100));
+
+            //grey
+            var grey = OCRHelper.ConvertToGray(item.ResultImages.Last());
+            item.ResultImages.Add(grey);
+
+            // Define the threshold for the darkest grey
+            const byte darkestGreyThreshold = 238; // Corresponding to #EEEEEE
+
+            // Create a mask for all pixels lighter than the darkest grey threshold
+            Mat mask = grey.InRange(new Scalar(darkestGreyThreshold), new Scalar(255));
+
+            // Set those pixels to white
+            grey.SetTo(new Scalar(255), mask);
+
+            // Adjust the contrast of the image
+            Mat enhancedImage = new Mat();
+            Cv2.Normalize(grey, enhancedImage, 0, 255, NormTypes.MinMax);
+
+            item.ResultImages.Add(enhancedImage);
+
+            //switch black white
+            item.ResultImages.Add(OCRHelper.EnsureBlackTextOnWhite(item.ResultImages.Last()));
+
+            OCRHelper.ProcessWithTesseract(item, false, "", progressString);
+        }
+
+
+        public static void PatternMatching(OCRItem item, string progressString = null)
+        {
+            item.ResultImages = new List<OpenCvSharp.Mat>();
+
+            //original
+            item.ResultImages.Add(item.InputImage);
+
+            OCRHelper.PatternMatching(item, progressString);
+        }
+
+        public static void RectDimensions(OCRItem item, string progressString = null)
+        {
+            item.ResultImages = new List<OpenCvSharp.Mat>();
+
+            //original
+            item.ResultImages.Add(item.InputImage);
+
+            //grey
+            item.ResultImages.Add(OCRHelper.ConvertToGray(item.ResultImages.Last()));
+
+            //Otsu
+            item.ResultImages.Add(OCRHelper.ApplyThreshold(item.ResultImages.Last()));
+
+            //switch black white
+            item.ResultImages.Add(OCRHelper.EnsureBlackTextOnWhite(item.ResultImages.Last()));
+
+            var rect = OCRHelper.GetBoundingBoxOfBlackArea(item.ResultImages.Last());
+            double sideRatio = (double)rect.Width / rect.Height;
+            //check if sideRatio is within 10% of 1.5
+            bool isOne = sideRatio <= 0.45;
+            var mat = item.ResultImages.Last().Clone();
+            mat.Rectangle(rect, new Scalar(100, 100));
+            item.ResultImages.Add(mat);
+
+            if (isOne) item.Text = "1";
+            else item.Text = "0";
+        }
+
+        private static bool IsWithinRatio(double ratio, double target, double tolerance)
+        {
+            return Math.Abs(ratio - target) < tolerance;
+        }
+
         public static void TryEachSetting(OCRItem item, string progressString = null)
         {
-            var possibleSettings = GenerateLimitedSettingsCombinations();
+            var possibleSettings = GenerateLimitedSettingsCombinations(MassResults);
             foreach (var settings in possibleSettings)
             {
                 string progress = progressString + $" settings: {possibleSettings.IndexOf(settings)}/{possibleSettings.Count}";
-                ApplySettings(item, settings, progress);
+                string response = ApplySettings(item, settings, progress);
+                Trace.WriteLine(response);
             }
-            var topItem = item.MassAccuracy.OrderByDescending(x => x.Item1).First();
+            var topItem = item.MassAccuracy.OrderByDescending(x => x.Item1).FirstOrDefault();
             string mostAcc = $"Accuracy: {topItem.Item1} | Settings: {topItem.Item2}";
-            TopMassResults.Add(new OCRResultData() { Accuracy = topItem.Item1, Settings = String.Copy(topItem.Item2)});
+            TopMassResults.Add(new OCRResultData() { Accuracy = topItem.Item1, Settings = String.Copy(topItem.Item2) });
             item = null;
         }
 
-        public static void ApplySettings(OCRItem item, Settings settings, string progressString = null)
+        public static string ApplySettings(OCRItem item, Settings settings, string progressString = null)
         {
             //preprocessing
             //original
             var res = item.InputImage;
 
             //scaleup
-            if(settings.ScaleUp != null)
+            if (settings.ScaleUp != null)
             {
                 res = OCRHelper.ScaleUp(res, settings.ScaleUp.Value);
             }
@@ -152,7 +233,8 @@ namespace OCRPlayground.Core
 
             string ssettings = settings.GetSettings();
 
-            OCRHelper.ProcessWithTesseract(item, true, ssettings, progressString);
+            string response = OCRHelper.ProcessWithTesseract(item, true, ssettings, progressString);
+            return response;
         }
 
         /// <summary>
@@ -207,7 +289,7 @@ namespace OCRPlayground.Core
         /// Returns about 400 items
         /// </summary>
         /// <returns></returns>
-        public static List<Settings> GenerateLimitedSettingsCombinations()
+        public static List<Settings> GenerateLimitedSettingsCombinations(List<OCRResultData> massResults)
         {
             List<Settings> limitedSettings = new List<Settings>();
 
@@ -280,6 +362,31 @@ namespace OCRPlayground.Core
                     }
                 }
             }
+
+            var stopWatch = new Stopwatch();
+
+            //remove bottom 30% of settings when having more than 200 results per setting;
+            List<Tuple<string, int, double>> settingsAccuracy = new List<Tuple<string, int, double>>();
+            foreach (var setting in limitedSettings)
+            {
+                var settingString = setting.GetSettings();
+                var accuracy = massResults.Where(x => x.Settings == settingString).Select(x => x.Accuracy).ToList();
+                settingsAccuracy.Add(new Tuple<string, int, double>(settingString, accuracy.Count, accuracy.Average()));
+            }
+
+            //just return full list if less than 200
+            if(settingsAccuracy.Any(x => settingsAccuracy.Where(y => y.Item1 == x.Item1).Count() < 200))
+                return limitedSettings;
+
+            //order by accuracy
+            settingsAccuracy = settingsAccuracy.OrderByDescending(x => x.Item3).ToList();
+
+            //remove bottom 30%
+            var top70 = settingsAccuracy.Take((int)(settingsAccuracy.Count * 0.7)).ToList();
+            limitedSettings = limitedSettings.Where(x => top70.Any(y => y.Item1 == x.GetSettings())).ToList();
+
+            stopWatch.Stop();
+            Trace.WriteLine($"Time taken: {stopWatch.ElapsedMilliseconds}");
 
             return limitedSettings;
         }

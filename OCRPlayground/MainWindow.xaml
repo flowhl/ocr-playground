@@ -10,7 +10,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="400" />
             <ColumnDefinition Width="200" />
-            <ColumnDefinition Width="400" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
             <StackPanel Margin="5" Name="SPInput"></StackPanel>
@@ -23,6 +23,7 @@
             <ComboBox Name="CBMethod"></ComboBox>
             <Button Style="{StaticResource Primary}" Height="30" Name="btnRun" Click="btnRun_Click">Run</Button>
             <Button Style="{StaticResource Primary}" Height="30" Name="btnMassTest" Click="btnMassTest_Click" >Mass Test</Button>
+            <Button Style="{StaticResource Primary}" Height="30" Name="btnRandomPickFromFolder" Click="btnRandomPickFromFolder_Click">Decrease folder size</Button>
             <Label Style="{StaticResource PS}" Name="ResultText"></Label>
         </StackPanel>
     </Grid>

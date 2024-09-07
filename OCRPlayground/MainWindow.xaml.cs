@@ -6,6 +6,7 @@ using OpenCvSharp.WpfExtensions;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -83,7 +84,13 @@ namespace OCRPlayground
         public void Run()
         {
             //get processing method
-            string methodname = CBMethod.SelectedItem.ToString();
+            string methodname = CBMethod.SelectedItem?.ToString();
+            if (methodname.IsNullOrEmpty() || Files.Count == 0)
+            {
+                MessageBox.Show("Please select a method and files to process");
+                return;
+            }
+
             if (methodname.IsNullOrEmpty()) return;
             var methodInfo = typeof(ImageProcessor).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public).Where(x => x.GetParameters().Any(x => x.ParameterType.Name == "OCRItem") && x.Name == methodname).FirstOrDefault();
 
@@ -101,7 +108,7 @@ namespace OCRPlayground
             foreach (var item in Items)
             {
                 string progress = $"item: {Items.IndexOf(item) + 1}/{Items.Count}";
-                methodInfo.Invoke(null, new object[] { item, progress});
+                methodInfo.Invoke(null, new object[] { item, progress });
             }
 
             //display 
@@ -131,6 +138,12 @@ namespace OCRPlayground
         {
             DateTime Start = DateTime.Now;
 
+            if (Files == null || Files.Count == 0)
+            {
+                MessageBox.Show("Please select files to process");
+                return;
+            }
+
             List<Task> taskList = new List<Task>();
             SemaphoreSlim semaphore = new SemaphoreSlim(12);
 
@@ -146,10 +159,19 @@ namespace OCRPlayground
                         {
                             int totalAmount = Files.Count;
                             int padValue = totalAmount.ToString().Length;
-                            string progress = $"item: {(Files.IndexOf(file) + 1).ToString().PadLeft(padValue, '0')}/{Files.Count} progress: {(((double)Files.IndexOf(file) + 1)/((double)Files.Count) * 100).ToString("F2")}%";
+                            string progress = $"item: {(Files.IndexOf(file) + 1).ToString().PadLeft(padValue, '0')}/{Files.Count} progress: {(((double)Files.IndexOf(file) + 1) / ((double)Files.Count) * 100).ToString("F2")}%";
                             newItem.InputImagePath = file;
                             newItem.FillInputImage();
-                            ImageProcessor.TryEachSetting(newItem, progress);
+                            try
+                            {
+
+                                ImageProcessor.TryEachSetting(newItem, progress);
+                            }
+                            catch (Exception ex)
+                            {
+                                Trace.WriteLine(ex.Message);
+                                throw;
+                            }
                         }
                         GC.Collect();
                     }
@@ -163,7 +185,7 @@ namespace OCRPlayground
             }
 
             Task.WaitAll(taskList.ToArray());
-            
+
 
             List<OCRAverageResults> AverageSettings = new List<OCRAverageResults>();
             lock (ImageProcessor.MassResults)
@@ -182,7 +204,7 @@ namespace OCRPlayground
                         double nullItemRate = (double)nullItemCount / (double)ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type);
                         int numericCount = ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type && x.ResultText.IsNumeric());
                         double numericRate = (double)numericCount / (double)ImageProcessor.MassResults.Count(x => x.Settings == setting && x.Type == type);
-                        AverageSettings.Add(new OCRAverageResults { Accuracy = average, MaxAccuracy = max, MinAccuracy = min, Settings = setting, Type = type, NullItemCount = nullItemCount, NullItemRate = nullItemRate, NumericCount = numericCount, NumericRate = numericRate});
+                        AverageSettings.Add(new OCRAverageResults { Accuracy = average, MaxAccuracy = max, MinAccuracy = min, Settings = setting, Type = type, NullItemCount = nullItemCount, NullItemRate = nullItemRate, NumericCount = numericCount, NumericRate = numericRate });
                     }
                 }
 
@@ -277,6 +299,35 @@ namespace OCRPlayground
         private void btnMassTest_Click(object sender, RoutedEventArgs e)
         {
             RunMassTest();
+        }
+
+        private void btnRandomPickFromFolder_Click(object sender, RoutedEventArgs e)
+        {
+            //Let user pick folder using default dialog
+            var folderDialog = new System.Windows.Forms.FolderBrowserDialog();
+            //Initial Folder is Desktop
+            folderDialog.SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            //Show Dialog
+            folderDialog.ShowDialog();
+
+            //Create a folder of similar name with postfix "_random" in the same directory
+            var folderPath = folderDialog.SelectedPath;
+            var folderName = System.IO.Path.GetFileName(folderPath);
+            var newFolderPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(folderPath), folderName + "_random");
+            System.IO.Directory.CreateDirectory(newFolderPath);
+
+            //Get all files in the folder
+            var files = System.IO.Directory.GetFiles(folderPath);
+
+            //Copy 20% of the files to the new folder
+            var random = new Random();
+            var randomFiles = files.OrderBy(x => random.Next()).Take((int)(files.Count() * 0.2)).ToList();
+            foreach (var file in randomFiles)
+            {
+                var newFilePath = System.IO.Path.Combine(newFolderPath, System.IO.Path.GetFileName(file));
+                Trace.WriteLine($"Copying {file} to {newFilePath}");
+                System.IO.File.Copy(file, newFilePath);
+            }
         }
     }
 
