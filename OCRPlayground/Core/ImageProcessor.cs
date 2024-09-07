@@ -363,6 +363,14 @@ namespace OCRPlayground.Core
                 }
             }
 
+            //disable for now
+            return limitedSettings;
+
+            if (massResults == null || massResults.Count == 0)
+            {
+                return limitedSettings;
+            }
+
             var stopWatch = new Stopwatch();
 
             //remove bottom 30% of settings when having more than 200 results per setting;
@@ -370,23 +378,38 @@ namespace OCRPlayground.Core
             foreach (var setting in limitedSettings)
             {
                 var settingString = setting.GetSettings();
-                var accuracy = massResults.Where(x => x.Settings == settingString).Select(x => x.Accuracy).ToList();
+
+                var mr = massResults.Where(x => x!= null && x.Settings == settingString);
+
+                //if we cant find any results for this setting, just return full list
+                if (mr == null || mr.Count() == 0)
+                {
+                    stopWatch.Stop();
+                    return limitedSettings;
+                }
+
+                var accuracy = mr.Select(x => x.Accuracy).ToList();
                 settingsAccuracy.Add(new Tuple<string, int, double>(settingString, accuracy.Count, accuracy.Average()));
             }
 
-            //just return full list if less than 200
-            if(settingsAccuracy.Any(x => settingsAccuracy.Where(y => y.Item1 == x.Item1).Count() < 200))
+            bool hasAll100 = settingsAccuracy.Any(x => x.Item2 < 100);
+
+            //just return full list if less than 100
+            if (settingsAccuracy == null || settingsAccuracy.Count() == 0 || hasAll100)
+            {
+                stopWatch.Stop();
                 return limitedSettings;
+            }
 
             //order by accuracy
             settingsAccuracy = settingsAccuracy.OrderByDescending(x => x.Item3).ToList();
 
-            //remove bottom 30%
-            var top70 = settingsAccuracy.Take((int)(settingsAccuracy.Count * 0.7)).ToList();
-            limitedSettings = limitedSettings.Where(x => top70.Any(y => y.Item1 == x.GetSettings())).ToList();
+            //remove bottom 50%
+            var top = settingsAccuracy.Take((int)(settingsAccuracy.Count * 0.5)).ToList();
+            limitedSettings = limitedSettings.Where(x => top.Any(y => y.Item1 == x.GetSettings())).ToList();
 
             stopWatch.Stop();
-            Trace.WriteLine($"Time taken: {stopWatch.ElapsedMilliseconds}");
+            //Trace.WriteLine($"Time taken: {stopWatch.ElapsedMilliseconds}");
 
             return limitedSettings;
         }

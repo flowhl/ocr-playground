@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Tesseract;
 
@@ -44,18 +45,45 @@ namespace OCRPlayground.Core
                         {
                             type = "teamname";
                         }
-                        else if (item.InputImagePath.Contains("time") || item.InputImagePath.ToLower().Contains("time"))
+                        else if (item.InputImagePath.Contains("$time") || item.InputImagePath.ToLower().Contains("time"))
                         {
                             type = "time";
+                        }
+
+                        //the expected value is in the image path between $val_ and _endval
+                        bool hasExpectedResult = item.InputImagePath.ToLower().Contains("$val_") && item.InputImagePath.ToLower().Contains("_endval");
+                        string pattern = @"\$val_(\w+)_endval"; // Regex pattern to match the value between $val_ and _endval
+                        string expectedValue = null;
+
+                        Match match = Regex.Match(item.InputImagePath, pattern);
+
+                        if (match.Success)
+                        {
+                            expectedValue = match.Groups[1].Value; // Extract the captured group
                         }
 
                         if (text.Length > 4 || type == "time" || type == "score")
                         {
                             lock (ImageProcessor.MassResults)
                             {
-                                ImageProcessor.MassResults.Add(new OCRResultData { Accuracy = page.GetMeanConfidence(), Settings = settingsstring, Type = type, ResultText = text });
+                                var result = new OCRResultData { Accuracy = page.GetMeanConfidence(), Settings = settingsstring, Type = type, ResultText = text };
+                                
+                                //Set accuracy to 0 if the expected value is not found
+                                if (hasExpectedResult && expectedValue.IsNotNullOrEmpty())
+                                {
+                                    if (text.Trim().ToLower() != expectedValue.Trim().ToLower())
+                                    {
+                                        result.Accuracy = 0;
+                                    }
+                                    //else
+                                    //{
+                                    //    result.Accuracy = 1;
+                                    //}
+                                }
+
+                                ImageProcessor.MassResults.Add(result);
+                                item.MassAccuracy.Add(new Tuple<double, string>(result.Accuracy, settingsstring));
                             }
-                            item.MassAccuracy.Add(new Tuple<double, string>(page.GetMeanConfidence(), settingsstring));
                         }
                     }
 
@@ -241,7 +269,7 @@ namespace OCRPlayground.Core
             else
             {
                 // Return an empty rectangle if no black pixels were found
-                return new OpenCvSharp.Rect(0,0,0,0);
+                return new OpenCvSharp.Rect(0, 0, 0, 0);
             }
         }
 
