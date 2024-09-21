@@ -19,9 +19,43 @@ namespace OCRPlayground.Core
 
             using (var engine = new TesseractEngine(@"D:\Github_repos\xstrat\Enterprise\xstrat-client\xstrat\External\tessdata", "naptha", EngineMode.Default))
             {
+                #region type
+                string type = "";
+                if (item.InputImagePath.Contains("$name"))
+                {
+                    type = "name";
+                }
+                else if (item.InputImagePath.Contains("$score") || item.InputImagePath.ToLower().Contains("score"))
+                {
+                    type = "score";
+                }
+                else if (item.InputImagePath.Contains("$teamname") || item.InputImagePath.ToLower().Contains("teamname"))
+                {
+                    type = "teamname";
+                }
+                else if (item.InputImagePath.Contains("$time") || item.InputImagePath.ToLower().Contains("time"))
+                {
+                    type = "time";
+                }
+                #endregion
+
                 // Limit the characters Tesseract uses for OCR
                 //engine.SetVariable("tessedit_char_whitelist", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-_,;: ");
-                engine.SetVariable("tessedit_char_whitelist", "0123456789");
+                if (type == "score")
+                {
+                    Trace.WriteLine("Setting whitelist to 0123456789");
+                    engine.SetVariable("tessedit_char_whitelist", "0123456789");
+                }
+                else if (type == "time")
+                {
+                    Trace.WriteLine("Setting whitelist to 0123456789:");
+                    engine.SetVariable("tessedit_char_whitelist", "0123456789:");
+                }
+                else
+                {
+                    Trace.WriteLine("Setting whitelist to ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.- _,;: ");
+                    engine.SetVariable("tessedit_char_whitelist", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-_,;: ");
+                }
 
                 // Run OCR on the image and retrieve the recognized text
                 using (var page = engine.Process(OCRHelper.GetPixFromMat(item.ResultImages.Last()), PageSegMode.SingleLine))
@@ -32,23 +66,6 @@ namespace OCRPlayground.Core
                         item.Accuracy = page.GetMeanConfidence();
                     else
                     {
-                        string type = "";
-                        if (item.InputImagePath.Contains("$name"))
-                        {
-                            type = "name";
-                        }
-                        else if (item.InputImagePath.Contains("$score") || item.InputImagePath.ToLower().Contains("score"))
-                        {
-                            type = "score";
-                        }
-                        else if (item.InputImagePath.Contains("$teamname") || item.InputImagePath.ToLower().Contains("teamname"))
-                        {
-                            type = "teamname";
-                        }
-                        else if (item.InputImagePath.Contains("$time") || item.InputImagePath.ToLower().Contains("time"))
-                        {
-                            type = "time";
-                        }
 
                         //the expected value is in the image path between $val_ and _endval
                         bool hasExpectedResult = item.InputImagePath.ToLower().Contains("$val_") && item.InputImagePath.ToLower().Contains("_endval");
@@ -67,7 +84,7 @@ namespace OCRPlayground.Core
                             lock (ImageProcessor.MassResults)
                             {
                                 var result = new OCRResultData { Accuracy = page.GetMeanConfidence(), Settings = settingsstring, Type = type, ResultText = text };
-                                
+
                                 //Set accuracy to 0 if the expected value is not found
                                 if (hasExpectedResult && expectedValue.IsNotNullOrEmpty())
                                 {

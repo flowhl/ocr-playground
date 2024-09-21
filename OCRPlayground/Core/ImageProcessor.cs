@@ -163,7 +163,9 @@ namespace OCRPlayground.Core
                 Trace.WriteLine(response);
             }
             var topItem = item.MassAccuracy.OrderByDescending(x => x.Item1).FirstOrDefault();
-            string mostAcc = $"Accuracy: {topItem.Item1} | Settings: {topItem.Item2}";
+            if (topItem == null) return;
+
+            string mostAcc = $"Accuracy: {topItem?.Item1} | Settings: {topItem?.Item2}";
             TopMassResults.Add(new OCRResultData() { Accuracy = topItem.Item1, Settings = String.Copy(topItem.Item2) });
             item = null;
         }
